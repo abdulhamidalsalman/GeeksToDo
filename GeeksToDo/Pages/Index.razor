@@ -1,0 +1,423 @@
+﻿@page "/"
+@inject IDialogService DialogService
+@inject IJSRuntime js;
+
+<div class="flex flex-row h-screen font-sans">
+
+	<div class="bg-coolGray-50 w-2/12 flex-grow-0 flex-shrink-0" oncontextmenu="return false">
+		<div class="flex flex-col divide-y min-w-full">
+			<div class="pb-4">
+				<p class="py-2 px-4 text-gray-500">Geeks ToDo App</p>
+				<div class="flex px-4 mt-2">
+					<img class="object-contain pr-2 rounded-full" src="/img/avatar.png" />
+					<div>
+						<p>Bob Smith</p>
+						<p class="text-gray-500">todo@geeks.com.sa</p>
+					</div>
+				</div>
+			</div>
+
+
+			<div class="flex flex-col mt-4 px-1 space-y-2">
+				@foreach (TodoList list in TodoLists)
+				{
+					<MudMenu ActivationEvent="@MouseEvent.RightClick" Class="d-flex flex-column" FullWidth="true">
+						<ActivatorContent>
+							@if (list.Id == selectedTodoList.Id && todoListRenameMode)
+							{
+								<div class="flex justify-between items-center px-3 bg-gray-100 hover:bg-gray-100 border-l-2 border-blue-500">
+									<div class="flex items-center space-x-4 py-2 text-blue-500">
+										<MudIcon Icon="@Icons.Material.Filled.Menu" IconColor="Color.Primary" />
+										<MudInput Value="@list.Title"
+												  Disabled="false"
+												  DisableUnderLine="false"
+												  AutoFocus="true"
+												  OnKeyDown="((KeyboardEventArgs e) => onTodListRenameEnter(e, list))"
+												  OnBlur="@(() => exitRenameMode(list))"
+												  Immediate="true"
+												  ValueChanged="@((string value) => applyRename(value, list))"
+												  Class=""
+												  Style="@blue" />
+									</div>
+									<p class="text-gray-500">@(list.getRemainingCount() > 0 ? list.getRemainingCount() : "")</p>
+								</div>
+							}
+							else if (list.Id == selectedTodoList.Id)
+							{
+								<div class="flex justify-between items-center px-3 bg-gray-100 hover:bg-gray-100 border-l-2 border-blue-500 " @onclick="@(() => setCurrentTodoList(list))">
+									<div class="flex items-center space-x-4 py-2 text-blue-500">
+										<MudIcon Icon="@Icons.Material.Filled.Menu" IconColor="Color.Primary" />
+										<MudInput Value="@list.Title" Disabled="true" DisableUnderLine="true" Class="" Style="@blue" />
+									</div>
+									<p class="text-gray-500">@(list.getRemainingCount() > 0 ? list.getRemainingCount() : "")</p>
+								</div>
+							}
+							else
+							{
+								<div class="flex justify-between items-center px-3 hover:bg-gray-100" @onclick="@(() => setCurrentTodoList(list))">
+									<div class="flex items-center space-x-4 py-2">
+										<MudIcon Icon="@Icons.Material.Filled.Menu" IconColor="Color.Primary" />
+										<MudInput Value="@list.Title" Disabled="true" DisableUnderLine="true" Class="black-text" />
+									</div>
+									<p class="text-gray-500">@(list.getRemainingCount() > 0 ? list.getRemainingCount() : "")</p>
+								</div>
+							}
+
+						</ActivatorContent>
+						<ChildContent>
+							<MudMenuItem OnClick="@(() => renameTodoList(list))">Rename list</MudMenuItem>
+							<MudMenuItem Class="text-red-500" OnClick="@(() => showDeleteListDialog(list))">Delete list</MudMenuItem>
+						</ChildContent>
+					</MudMenu>
+				}
+			</div>
+		</div>
+		<div class="">
+			<MudList Clickable="true">
+				<MudListItem Text="New list" Icon="@Icons.Material.Filled.Add" IconColor="Color.Surface" OnClick="addNewTodoList" />
+			</MudList>
+		</div>
+
+	</div>
+
+	<div class="bg-sky flex-auto object-cover ">
+		<div class="flex flex-col h-full relative p-8">
+			<p class="text-3xl text-white font-medium">@selectedTodoList.Title</p>
+			<div class="flex-auto overflow-y-auto space-y-2 mt-12">
+				@foreach (TodoItem todo in selectedTodoList.Items)
+				{
+					@if (!todo.IsDone)
+					{
+						<div class="flex justify-between items-center w-full bg-white py-1 rounded" @onclick="@(()=>showDetailsPane(todo))">
+							<div class="flex items-center text-sm">
+								<MudCheckBox Checked="@todo.IsDone" CheckedChanged="@((bool value) => CheckedChanged(value, todo))" Color="Color.Info"></MudCheckBox>
+								<p>@todo.Title</p>
+							</div>
+							@if (isOverDue(todo))
+							{
+								<img src="/img/due2.png" class="block mx-4 w-6 h-6" />
+							}
+						</div>
+					}
+				}
+				@if (getCompletedTodosCount() > 0)
+				{
+					<div class="complete">
+						<MudExpansionPanels DisableBorders="true" Elevation="0">
+							<MudExpansionPanel Text="@CurrentTodoListCompletedCount" Class="font-medium text-green-700 bg-white space-y-2">
+								@foreach (TodoItem todo in selectedTodoList.Items)
+								{
+									@if (todo.IsDone)
+									{
+										<div class="flex items-center w-full  py-1 rounded line-through bg-white text-gray-500" @onclick="@(()=>showDetailsPane(todo))">
+											<MudCheckBox Class="" Checked="@todo.IsDone" CheckedChanged="@((bool value) => CheckedChanged(value, todo))" Color="Color.Info"></MudCheckBox>
+											<p>@todo.Title</p>
+										</div>
+									}
+								}
+							</MudExpansionPanel>
+						</MudExpansionPanels>
+					</div>
+				}
+			</div>
+			<div class="p-8 flex-none"></div>
+			<div class="min-w-full absolute bottom-0 left-0 p-8">
+				<MudInput Class="py-2 px-2 rounded"
+						  Style="@bluegrey"
+						  T="string"
+						  AdornmentColor="Color.Surface"
+						  Adornment="Adornment.Start"
+						  AdornmentIcon="@Icons.Material.Filled.Add"
+						  Placeholder="Add a task"
+						  @bind-Value="@NewTask"
+						  OnKeyUp="(KeyboardEventArgs e) => onNewTodoEnter(e)" />
+			</div>
+		</div>
+
+		<audio id="player">
+			<source id="playerSource" src="" />
+		</audio>
+
+	</div>
+
+	@if (selectedTodoItem != null)
+	{
+		<div class="bg-coolGray-50 w-3/12 flex-grow-0 @SideStatus">
+			<div>
+				<div class="flex flex-row  items-center py-5 w-full pr-4">
+					<MudCheckBox Checked="@selectedTodoItem.IsDone" CheckedChanged="@((bool value) => CheckedChanged(value, selectedTodoItem))" Color="Color.Info"></MudCheckBox>
+					<MudInput Value="@selectedTodoItem.Title"
+							  Disabled="false"
+							  DisableUnderLine="false"
+							  Immediate="true"
+							  ValueChanged="@((string value) => applyTodoRename(value))"
+							  Class="text-gray-800 text-base w-full"
+							  Style="@blue"
+							  FullWidth="true" />
+				</div>
+
+
+				<div class="flex-grow bg-gray-100 px-2">
+					<MudDatePicker Style="@datePickStyle"
+								   Adornment="Adornment.Start"
+								   Editable="true"
+								   DisableToolbar="true"
+								   InputVariant="Variant.Outlined"
+								   Rounded="true"
+								   @bind-Date="selectedTodoItem.DueDate"  />
+
+					<MudTextField T="string" 
+								  Style="@datePickStyle" 
+								  Class="bg-white" 
+								  Variant="Variant.Outlined" 
+								  Placeholder="Add note"
+								  Lines="30"
+								  @bind-Value="selectedTodoItem.Note"/>
+				</div>
+
+				<div class="flex justify-between px-2 py-8">
+					<MudIcon Icon="@Icons.Material.Filled.KeyboardArrowRight" Color="Color.Default" @onclick="hideDetailsPane" />
+					<p class="text-gray-500">Created on Tuesday, April 12</p>
+					<MudIcon Icon="@Icons.Material.Filled.Delete" Color="Color.Default" @onclick="showDeleteTask" />
+
+				</div>
+			</div>
+		</div>
+	}
+</div>
+
+@code{
+
+	string blue = $"color:{Colors.Blue.Darken2};";
+	string bluegrey = $"color:#FFFFFF;background-color:#0a171d; width: 100%;";
+	string whiteColor = $"color:#FFFFFF;";
+	string datePickStyle = $"color:{Colors.Shades.Black};background-color:{Colors.Shades.White}";
+
+	public string NewTask { get; set; }
+	public string SideStatus { get; set; }
+	public bool todoListRenameMode = false;
+	public string CurrentTodoListCompletedCount
+	{
+		get
+		{
+			return "Completed  " + getCompletedTodosCount().ToString();
+		}
+		set { }
+	}
+
+
+	public List<TodoList> TodoLists { get; set; } = new List<TodoList>();
+
+	public TodoList selectedTodoList { get; set; }
+
+	public TodoItem selectedTodoItem { get; set; }
+	public string currentSelectedTodoItemTitle { get; set; }
+
+	protected override void OnInitialized()
+	{
+
+		TodoList workList = new TodoList("Work");
+		workList.Items.Add(new TodoItem("Develop Cascading Style Sheets for home page"));
+		workList.Items.Add(new TodoItem("Meet with customer to approve the desing"));
+		workList.Items.Add(new TodoItem("Add continuous delivery support to the application"));
+
+		TodoList familyList = new TodoList("Family");
+		familyList.Items.Add(new TodoItem("Buy new Air conditioning"));
+		familyList.Items.Add(new TodoItem("Buy veggies"));
+		familyList.Items.Add(new TodoItem("Fix front door lock"));
+
+
+		TodoList schoolList = new TodoList("School");
+		schoolList.Items.Add(new TodoItem("Study for Math midterm exam"));
+		schoolList.Items.Add(new TodoItem("Biology assignment 2"));
+		schoolList.Items.Add(new TodoItem("Finish research paper for NoSQL databases 201"));
+
+
+		TodoList friendsList = new TodoList("Friends");
+		friendsList.Items.Add(new TodoItem("Prepare materials for fishing trip"));
+		friendsList.Items.Add(new TodoItem("Call Tom to arrange reservations"));
+
+
+		TodoLists.Add(workList);
+		TodoLists.Add(familyList);
+		TodoLists.Add(schoolList);
+		TodoLists.Add(friendsList);
+
+		selectedTodoList = TodoLists[0];
+	}
+
+
+	public void setCurrentTodoList(TodoList list)
+	{
+		selectedTodoList = list;
+	}
+
+	public void renameTodoList(TodoList list)
+	{
+		selectedTodoList = list;
+		todoListRenameMode = true;
+	}
+
+	public void applyRename(string newTitle, TodoList list)
+	{
+		TodoList target = TodoLists.Find(l => l.Id == list.Id);
+		target.Title = newTitle;
+	}
+
+	public void applyTodoRename(string newTitle)
+	{
+		if (string.IsNullOrWhiteSpace(newTitle))
+		{
+			selectedTodoItem.Title = currentSelectedTodoItemTitle;
+		}
+		else
+		{
+			selectedTodoItem.Title = newTitle;
+		}
+
+	}
+
+
+
+	public void exitRenameMode(TodoList list)
+	{
+		if (string.IsNullOrWhiteSpace(list.Title))
+		{
+			list.Title = "Untitled list";
+		}
+
+		todoListRenameMode = false;
+	}
+
+	public void onTodListRenameEnter(KeyboardEventArgs e, TodoList list)
+	{
+		if (e.Code == "Enter" || e.Code == "NumpadEnter")
+		{
+			this.exitRenameMode(list);
+		}
+	}
+
+
+
+	public void onNewTodoEnter(KeyboardEventArgs e)
+	{
+
+		if (e.Code == "Enter" || e.Code == "NumpadEnter")
+		{
+			if (!string.IsNullOrEmpty(this.NewTask))
+			{
+				selectedTodoList.Items.Add(new TodoItem(this.NewTask));
+				this.NewTask = string.Empty;
+
+			}
+		}
+		this.NewTask = string.Empty;
+	}
+
+
+
+	public void addNewTodoList()
+	{
+		TodoList newList = new TodoList("Untitled list");
+		selectedTodoList = newList;
+		todoListRenameMode = true;
+		this.TodoLists.Add(newList);
+	}
+
+	private void hideDetailsPane()
+	{
+		SideStatus = "hidden";
+	}
+
+	private void showDetailsPane(TodoItem todo)
+	{
+		selectedTodoItem = todo;
+		currentSelectedTodoItemTitle = todo.Title;
+		SideStatus = "";
+	}
+
+
+	private void showDeleteTask()
+	{
+		var parameters = new DialogParameters();
+		parameters.Add("ContentText", "\"buy apples\" will be permenatly deleted.");
+		parameters.Add("ButtonText", "Delete");
+		parameters.Add("Color", Color.Error);
+		parameters.Add("TodoList", selectedTodoList);
+		parameters.Add("TargetTask", selectedTodoItem);
+		parameters.Add("IndexPage", this);
+
+		var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+		DialogService.Show<DeleteTodoItemDialog>("Delete task", parameters, options);
+	}
+
+
+
+	public void showDeleteListDialog(TodoList list)
+	{
+		var parameters = new DialogParameters();
+		parameters.Add("ContentText", $"\"{list.Title}\" list will be permenatly deleted.");
+		parameters.Add("ButtonText", "Delete");
+		parameters.Add("Color", Color.Error);
+		parameters.Add("TodoLists", TodoLists);
+		parameters.Add("TargetList", list);
+		parameters.Add("IndexPage", this);
+
+
+		var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+		DialogService.Show<DeleteTodoListDialog>("Delete task", parameters, options);
+
+	}
+
+	public void OnTodoListDeleted()
+	{
+		this.StateHasChanged();
+		if (TodoLists.Count > 0) selectedTodoList = TodoLists[0];
+	}
+
+	public void OnTodoDeleted()
+	{
+		this.StateHasChanged();
+		this.hideDetailsPane();
+	}
+
+	public bool isOverDue(TodoItem todo)
+	{
+		if (todo.DueDate != null)
+		{
+			return todo.DueDate < DateTime.Now;
+		}
+
+		return false;
+
+	}
+
+	public int getCompletedTodosCount()
+	{
+		if (selectedTodoList != null)
+		{
+			return selectedTodoList.getCompletedCount();
+		}
+		else
+		{
+			return 0;
+		}
+	}
+
+	async Task playSound()
+	{
+		await js.InvokeVoidAsync("PlayAudioJs", "/sounds/ding.mp3");
+	}
+
+	async Task CheckedChanged(bool value, TodoItem todo)
+	{
+		if (value == true)
+		{
+			await playSound();
+		}
+
+		todo.IsDone = !todo.IsDone;
+	}
+}

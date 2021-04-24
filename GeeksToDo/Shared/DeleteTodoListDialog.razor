@@ -1,0 +1,35 @@
+﻿<MudDialog>
+	<DialogContent>
+		<MudText>@ContentText</MudText>
+	</DialogContent>
+	<DialogActions>
+		<MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="Cancel">Cancel</MudButton>
+		<MudButton Color="@Color" Variant="Variant.Filled" OnClick="Submit">@ButtonText</MudButton>
+	</DialogActions>
+</MudDialog>
+@code {
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+	[Parameter] public string ContentText { get; set; }
+
+	[Parameter] public string ButtonText { get; set; }
+
+	[Parameter] public Color Color { get; set; }
+
+	[Parameter] public TodoList TargetList { get; set; }
+
+	[Parameter] public List<TodoList> TodoLists { get; set; }
+
+	[Parameter]
+	public GeeksToDo.Pages.Index IndexPage { get; set; }
+
+	void Submit()
+	{
+		TodoLists.Remove(TargetList);
+		IndexPage.OnTodoListDeleted();
+		MudDialog.Close(DialogResult.Ok(true));
+
+
+	}
+	void Cancel() => MudDialog.Cancel();
+}
