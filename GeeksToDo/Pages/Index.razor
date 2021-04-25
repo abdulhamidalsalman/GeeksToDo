@@ -250,6 +250,7 @@
 	public void setCurrentTodoList(TodoList list)
 	{
 		selectedTodoList = list;
+		this.hideDetailsPane();
 	}
 
 	public void renameTodoList(TodoList list)
@@ -340,7 +341,7 @@
 	private void showDeleteTask()
 	{
 		var parameters = new DialogParameters();
-		parameters.Add("ContentText", "\"buy apples\" will be permenatly deleted.");
+		parameters.Add("ContentText", $"\"{selectedTodoItem.Title}\" will be permenatly deleted.");
 		parameters.Add("ButtonText", "Delete");
 		parameters.Add("Color", Color.Error);
 		parameters.Add("TodoList", selectedTodoList);
